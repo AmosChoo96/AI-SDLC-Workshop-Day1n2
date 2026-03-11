@@ -218,17 +218,17 @@ export default function Home() {
 
       const payload = (await response.json()) as {
         data?: Todo;
+        next_todo?: Todo;
         error?: string;
       };
 
       if (!response.ok || !payload.data) {
         throw new Error(payload.error || "Failed to update todo.");
       }
-        const payload = (await response.json()) as {
-          data?: Todo;
-          next_todo?: Todo;
-          error?: string;
-        };
+
+      setTodos((current) =>
+        current.map((item) => (item.id === todo.id ? payload.data! : item)),
+      );
 
       if (payload.next_todo) {
         setTodos((current) => [payload.next_todo as Todo, ...current]);
