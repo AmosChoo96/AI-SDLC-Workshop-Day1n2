@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type Todo = {
   id: number;
@@ -20,6 +21,15 @@ type TodoDraft = {
   priority: "high" | "medium" | "low";
   recurrence_pattern: "none" | "daily" | "weekly" | "monthly" | "yearly";
   due_date: string;
+};
+
+type FilterPreset = {
+  name: string;
+  search: string;
+  priority: "all" | "high" | "medium" | "low";
+  completion: "all" | "completed" | "incomplete";
+  dateFrom: string;
+  dateTo: string;
 };
 
 const emptyDraft: TodoDraft = {
@@ -51,6 +61,16 @@ export default function Home() {
   const [priorityFilter, setPriorityFilter] = useState<
     "all" | "high" | "medium" | "low"
   >("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [completionFilter, setCompletionFilter] = useState<
+    "all" | "completed" | "incomplete"
+  >("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [presets, setPresets] = useState<FilterPreset[]>([]);
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
 
   const editingTodo = useMemo(
     () => todos.find((todo) => todo.id === editingId) ?? null,
@@ -59,7 +79,28 @@ export default function Home() {
 
   useEffect(() => {
     void fetchTodos();
+    loadPresets();
   }, []);
+
+  function loadPresets() {
+    try {
+      const saved = localStorage.getItem("filterPresets");
+      if (saved) {
+        setPresets(JSON.parse(saved) as FilterPreset[]);
+      }
+    } catch {
+      // Ignore errors loading presets
+    }
+  }
+
+  function savePresets(updatedPresets: FilterPreset[]) {
+    try {
+      localStorage.setItem("filterPresets", JSON.stringify(updatedPresets));
+      setPresets(updatedPresets);
+    } catch {
+      // Ignore errors saving presets
+    }
+  }
 
   async function fetchTodos() {
     setIsLoading(true);
@@ -354,20 +395,181 @@ export default function Home() {
     }
   }
 
-  const visibleTodos =
-    priorityFilter === "all"
-      ? todos
-      : todos.filter((todo) => todo.priority === priorityFilter);
+  async function handleExport(format: "json" | "csv") {
+    try {
+      const response = await fetch(`/api/todos/export?format=${format}`);
+      if (!response.ok) {
+        setError("Failed to export todos.");
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `todos-${new Date().toISOString().split("T")[0]}.${format === "json" ? "json" : "csv"}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setMessage(`Exported as ${format.toUpperCase()}`);
+    } catch {
+      setError(`Failed to export as ${format.toUpperCase()}`);
+    }
+  }
+
+  async function handleImport() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text) as unknown;
+
+        const response = await fetch("/api/todos/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+
+        const payload = (await response.json()) as {
+          imported?: number;
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Failed to import todos.");
+        }
+
+        setMessage(`Successfully imported ${payload.imported || 0} todos`);
+        void fetchTodos();
+      } catch {
+        setError("Failed to import todos. Please check the file format.");
+      }
+    };
+    input.click();
+  }
+
+  const visibleTodos = useMemo(() => {
+    let filtered = todos;
+
+    // Priority filter
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter((todo) => todo.priority === priorityFilter);
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((todo) =>
+        todo.title.toLowerCase().includes(query),
+      );
+    }
+
+    // Completion filter
+    if (completionFilter === "completed") {
+      filtered = filtered.filter((todo) => todo.completed);
+    } else if (completionFilter === "incomplete") {
+      filtered = filtered.filter((todo) => !todo.completed);
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      filtered = filtered.filter((todo) => {
+        if (!todo.due_date) return false;
+        const dueDate = new Date(todo.due_date);
+        if (dateFrom) {
+          const from = new Date(dateFrom);
+          if (dueDate < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo);
+          to.setHours(23, 59, 59, 999);
+          if (dueDate > to) return false;
+        }
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [todos, priorityFilter, searchQuery, completionFilter, dateFrom, dateTo]);
+
+  function handleSavePreset() {
+    if (!presetName.trim()) {
+      setError("Preset name is required.");
+      return;
+    }
+
+    const newPreset: FilterPreset = {
+      name: presetName,
+      search: searchQuery,
+      priority: priorityFilter,
+      completion: completionFilter,
+      dateFrom,
+      dateTo,
+    };
+
+    const updatedPresets = [...presets, newPreset];
+    savePresets(updatedPresets);
+    setPresetName("");
+    setShowSavePreset(false);
+    setMessage("Filter preset saved.");
+  }
+
+  function applyPreset(preset: FilterPreset) {
+    setSearchQuery(preset.search);
+    setPriorityFilter(preset.priority);
+    setCompletionFilter(preset.completion);
+    setDateFrom(preset.dateFrom);
+    setDateTo(preset.dateTo);
+  }
+
+  function deletePreset(name: string) {
+    const updatedPresets = presets.filter((p) => p.name !== name);
+    savePresets(updatedPresets);
+  }
+
+  const hasActiveFilters =
+    searchQuery || priorityFilter !== "all" || completionFilter !== "all" || dateFrom || dateTo;
+
+  function clearAllFilters() {
+    setSearchQuery("");
+    setPriorityFilter("all");
+    setCompletionFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   return (
     <main>
       <div className="container stack">
         <header className="stack">
-          <h1>Todo App - Core Feature 1</h1>
-          <p className="muted">
-            Create, read, update and delete todos with validation, Singapore
-            timestamps and optimistic UI updates.
-          </p>
+          <div className="row between">
+            <div>
+              <h1>Todo App</h1>
+              <p className="muted">
+                Organize your tasks with powerful filtering, search, and calendar view.
+              </p>
+            </div>
+            <div className="row">
+              <Link href="/calendar">
+                <button className="secondary">📅 Calendar</button>
+              </Link>
+              <button className="secondary" onClick={() => handleExport("json")}>
+                Export JSON
+              </button>
+              <button className="secondary" onClick={() => handleExport("csv")}>
+                Export CSV
+              </button>
+              <button className="secondary" onClick={handleImport}>
+                Import
+              </button>
+            </div>
+          </div>
         </header>
 
         <section className="card stack">
@@ -474,30 +676,207 @@ export default function Home() {
         <section className="card stack">
           <div className="row between">
             <h2>Todos</h2>
-            <div className="row">
-              <select
-                value={priorityFilter}
-                onChange={(event) =>
-                  setPriorityFilter(
-                    event.target.value as "all" | "high" | "medium" | "low",
-                  )
-                }
-              >
-                <option value="all">All Priorities</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-              <button className="secondary" onClick={() => void fetchTodos()}>
-                Refresh
-              </button>
-            </div>
+            <button className="secondary" onClick={() => void fetchTodos()}>
+              Refresh
+            </button>
           </div>
+
+          <div>
+            <input
+              type="text"
+              placeholder="🔍 Search todos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </div>
+
+          <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+            <select
+              value={priorityFilter}
+              onChange={(event) =>
+                setPriorityFilter(
+                  event.target.value as "all" | "high" | "medium" | "low",
+                )
+              }
+            >
+              <option value="all">All Priorities</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            <button
+              className="secondary"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              style={{
+                backgroundColor: showAdvanced ? "#3B82F6" : undefined,
+                color: showAdvanced ? "white" : undefined,
+              }}
+            >
+              {showAdvanced ? "▼" : "▶"} Advanced
+            </button>
+
+            {hasActiveFilters && (
+              <>
+                <button
+                  className="secondary"
+                  style={{ backgroundColor: "#EF4444", color: "white" }}
+                  onClick={clearAllFilters}
+                >
+                  Clear All
+                </button>
+                <button
+                  className="secondary"
+                  style={{ backgroundColor: "#10B981", color: "white" }}
+                  onClick={() => setShowSavePreset(true)}
+                >
+                  💾 Save Filter
+                </button>
+              </>
+            )}
+          </div>
+
+          {showAdvanced && (
+            <div
+              style={{
+                backgroundColor: "#F3F4F6",
+                padding: "1rem",
+                borderRadius: "0.5rem",
+              }}
+            >
+              <div className="row between">
+                <div className="row">
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", marginBottom: "0.25rem" }}>
+                      Completion Status
+                    </label>
+                    <select
+                      value={completionFilter}
+                      onChange={(e) =>
+                        setCompletionFilter(
+                          e.target.value as "all" | "completed" | "incomplete",
+                        )
+                      }
+                    >
+                      <option value="all">All Todos</option>
+                      <option value="incomplete">Incomplete Only</option>
+                      <option value="completed">Completed Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="row">
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", marginBottom: "0.25rem" }}>
+                      Due Date From
+                    </label>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", marginBottom: "0.25rem" }}>
+                      Due Date To
+                    </label>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {presets.length > 0 && (
+                <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #D1D5DB" }}>
+                  <p style={{ fontSize: "0.875rem", marginBottom: "0.5rem", color: "#6B7280" }}>
+                    Saved Filter Presets
+                  </p>
+                  <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+                    {presets.map((preset) => (
+                      <div
+                        key={preset.name}
+                        className="row"
+                        style={{
+                          backgroundColor: "white",
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: "0.25rem",
+                          border: "1px solid #D1D5DB",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        <button
+                          className="secondary"
+                          style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem" }}
+                          onClick={() => applyPreset(preset)}
+                        >
+                          {preset.name}
+                        </button>
+                        <button
+                          className="secondary"
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            fontSize: "0.875rem",
+                            backgroundColor: "#EF4444",
+                            color: "white",
+                          }}
+                          onClick={() => deletePreset(preset.name)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showSavePreset && (
+            <div
+              style={{
+                backgroundColor: "#FEF3C7",
+                padding: "1rem",
+                borderRadius: "0.5rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div className="row">
+                <input
+                  type="text"
+                  placeholder="Preset name"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="secondary"
+                  onClick={handleSavePreset}
+                  style={{ backgroundColor: "#10B981", color: "white" }}
+                >
+                  Save
+                </button>
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setShowSavePreset(false);
+                    setPresetName("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {isLoading ? <p className="muted">Loading...</p> : null}
 
-          {!isLoading && todos.length === 0 ? (
-            <p className="muted">No todos yet. Create your first one above.</p>
+          {!isLoading && visibleTodos.length === 0 ? (
+            <p className="muted">No todos match your criteria.</p>
           ) : null}
 
           {visibleTodos.map((todo) => (
@@ -507,18 +886,18 @@ export default function Home() {
             >
               <div className="row between">
                 <div className="row">
-                  <h3>{todo.title}</h3>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(todo.completed)}
+                    onChange={() => void handleToggle(todo)}
+                    style={{ marginRight: "0.5rem" }}
+                  />
+                  <h3 style={{ margin: 0 }}>{todo.title}</h3>
                   <span className={`badge ${todo.priority}`}>
                     {todo.priority.toUpperCase()}
                   </span>
                 </div>
                 <div className="row">
-                  <button
-                    className="secondary"
-                    onClick={() => void handleToggle(todo)}
-                  >
-                    {todo.completed ? "Mark Incomplete" : "Mark Complete"}
-                  </button>
                   <button
                     className="secondary"
                     onClick={() => startEdit(todo)}
@@ -537,29 +916,20 @@ export default function Home() {
 
               {todo.description ? <p>{todo.description}</p> : null}
 
-              <p className="muted">
-                Due:{" "}
-                {todo.due_date
-                  ? new Date(todo.due_date).toLocaleString("en-SG", {
-                      timeZone: "Asia/Singapore",
-                    })
-                  : "No due date"}
-              </p>
+              {todo.due_date && (
+                <p className="muted">
+                  Due:{" "}
+                  {new Date(todo.due_date).toLocaleString("en-SG", {
+                    timeZone: "Asia/Singapore",
+                  })}
+                </p>
+              )}
 
-              <p className="muted">
-                Recurrence:{" "}
-                {todo.recurrence_pattern
-                  ? todo.recurrence_pattern[0].toUpperCase() +
-                    todo.recurrence_pattern.slice(1)
-                  : "None"}
-              </p>
-
-              <p className="muted">
-                Updated:{" "}
-                {new Date(todo.updated_at).toLocaleString("en-SG", {
-                  timeZone: "Asia/Singapore",
-                })}
-              </p>
+              {todo.recurrence_pattern && (
+                <p className="muted">
+                  Recurrence: {todo.recurrence_pattern[0].toUpperCase() + todo.recurrence_pattern.slice(1)}
+                </p>
+              )}
             </article>
           ))}
         </section>
