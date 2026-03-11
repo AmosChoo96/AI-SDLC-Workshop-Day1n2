@@ -1,8 +1,8 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
-import { calculateNextDueDate } from '@/lib/timezone';
+import Database from "better-sqlite3";
+import path from "node:path";
+import { calculateNextDueDate } from "@/lib/timezone";
 
-const databasePath = path.join(process.cwd(), 'todos.db');
+const databasePath = path.join(process.cwd(), "todos.db");
 const db = new Database(databasePath, { timeout: 5000 });
 
 db.exec(`
@@ -19,7 +19,9 @@ db.exec(`
 `);
 
 try {
-  db.exec(`ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';`);
+  db.exec(
+    `ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';`,
+  );
 } catch {
   // Column already exists for existing databases.
 }
@@ -30,8 +32,8 @@ try {
   // Column already exists for existing databases.
 }
 
-export type Priority = 'high' | 'medium' | 'low';
-export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type Priority = "high" | "medium" | "low";
+export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
 
 export type Todo = {
   id: number;
@@ -119,7 +121,7 @@ const completeRecurringTx = db.transaction(
       current.due_date,
       1,
       nowIso,
-      id
+      id,
     );
 
     if (completedResult.changes === 0) {
@@ -128,7 +130,7 @@ const completeRecurringTx = db.transaction(
 
     const nextDueDate = calculateNextDueDate(
       current.due_date ?? nowIso,
-      current.recurrence_pattern as RecurrencePattern
+      current.recurrence_pattern as RecurrencePattern,
     );
 
     const insertResult = createStmt.run(
@@ -138,14 +140,16 @@ const completeRecurringTx = db.transaction(
       current.recurrence_pattern,
       nextDueDate,
       nowIso,
-      nowIso
+      nowIso,
     );
 
     const updatedCurrent = getByIdStmt.get(id) as Todo;
-    const nextTodo = getByIdStmt.get(Number(insertResult.lastInsertRowid)) as Todo;
+    const nextTodo = getByIdStmt.get(
+      Number(insertResult.lastInsertRowid),
+    ) as Todo;
 
     return { current: updatedCurrent, next: nextTodo };
-  }
+  },
 );
 
 export const todoDB = {
@@ -161,11 +165,11 @@ export const todoDB = {
     const result = createStmt.run(
       input.title,
       input.description ?? null,
-      input.priority ?? 'medium',
+      input.priority ?? "medium",
       input.recurrence_pattern ?? null,
       input.due_date ?? null,
       nowIso,
-      nowIso
+      nowIso,
     );
 
     return this.getById(Number(result.lastInsertRowid)) as Todo;
@@ -180,16 +184,21 @@ export const todoDB = {
 
     const title = input.title ?? existing.title;
     const description =
-      input.description === undefined ? existing.description : input.description;
+      input.description === undefined
+        ? existing.description
+        : input.description;
     const priority = input.priority ?? existing.priority;
     const recurrencePattern =
       input.recurrence_pattern === undefined
         ? existing.recurrence_pattern
         : input.recurrence_pattern;
-    const dueDate = input.due_date === undefined ? existing.due_date : input.due_date;
+    const dueDate =
+      input.due_date === undefined ? existing.due_date : input.due_date;
     const completed =
-      typeof input.completed === 'boolean'
-        ? (input.completed ? 1 : 0)
+      typeof input.completed === "boolean"
+        ? input.completed
+          ? 1
+          : 0
         : existing.completed;
 
     const result = updateStmt.run(
@@ -200,7 +209,7 @@ export const todoDB = {
       dueDate,
       completed,
       nowIso,
-      id
+      id,
     );
 
     if (result.changes === 0) {
@@ -215,7 +224,10 @@ export const todoDB = {
     return result.changes > 0;
   },
 
-  completeRecurring(id: number, nowIso: string): { current: Todo; next: Todo } | undefined {
+  completeRecurring(
+    id: number,
+    nowIso: string,
+  ): { current: Todo; next: Todo } | undefined {
     return completeRecurringTx(id, nowIso);
   },
 };

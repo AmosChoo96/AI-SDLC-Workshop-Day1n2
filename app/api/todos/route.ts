@@ -1,12 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { todoDB } from '@/lib/db';
-import { getSingaporeNow, isValidDateInput, toSingaporeIso } from '@/lib/timezone';
+import { NextRequest, NextResponse } from "next/server";
+import { todoDB } from "@/lib/db";
+import {
+  getSingaporeNow,
+  isValidDateInput,
+  toSingaporeIso,
+} from "@/lib/timezone";
 
 type CreateTodoRequest = {
   title?: string;
   description?: string;
-  priority?: 'high' | 'medium' | 'low';
-  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly' | null;
+  priority?: "high" | "medium" | "low";
+  recurrence_pattern?: "daily" | "weekly" | "monthly" | "yearly" | null;
   due_date?: string | null;
 };
 
@@ -14,34 +18,34 @@ function validateCreatePayload(body: CreateTodoRequest): string | null {
   const title = body.title?.trim();
 
   if (!title) {
-    return 'Title is required.';
+    return "Title is required.";
   }
 
   if (title.length > 120) {
-    return 'Title must be 120 characters or less.';
+    return "Title must be 120 characters or less.";
   }
 
   if (body.description && body.description.length > 500) {
-    return 'Description must be 500 characters or less.';
+    return "Description must be 500 characters or less.";
   }
 
   if (
     body.priority !== undefined &&
-    !['high', 'medium', 'low'].includes(body.priority)
+    !["high", "medium", "low"].includes(body.priority)
   ) {
-    return 'Priority must be high, medium, or low.';
+    return "Priority must be high, medium, or low.";
   }
 
   if (
     body.recurrence_pattern !== undefined &&
     body.recurrence_pattern !== null &&
-    !['daily', 'weekly', 'monthly', 'yearly'].includes(body.recurrence_pattern)
+    !["daily", "weekly", "monthly", "yearly"].includes(body.recurrence_pattern)
   ) {
-    return 'Recurrence pattern must be daily, weekly, monthly, yearly, or null.';
+    return "Recurrence pattern must be daily, weekly, monthly, yearly, or null.";
   }
 
   if (body.due_date && !isValidDateInput(body.due_date)) {
-    return 'Due date must be a valid ISO datetime string.';
+    return "Due date must be a valid ISO datetime string.";
   }
 
   return null;
@@ -53,8 +57,8 @@ export async function GET() {
     return NextResponse.json({ data: todos }, { status: 200 });
   } catch {
     return NextResponse.json(
-      { error: 'Failed to load todos.' },
-      { status: 500 }
+      { error: "Failed to load todos." },
+      { status: 500 },
     );
   }
 }
@@ -73,18 +77,18 @@ export async function POST(request: NextRequest) {
       {
         title: body.title!.trim(),
         description: body.description?.trim() || null,
-        priority: body.priority ?? 'medium',
+        priority: body.priority ?? "medium",
         recurrence_pattern: body.recurrence_pattern ?? null,
         due_date: body.due_date || null,
       },
-      nowIso
+      nowIso,
     );
 
     return NextResponse.json({ data: todo }, { status: 201 });
   } catch {
     return NextResponse.json(
-      { error: 'Failed to create todo.' },
-      { status: 500 }
+      { error: "Failed to create todo." },
+      { status: 500 },
     );
   }
 }

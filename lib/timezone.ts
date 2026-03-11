@@ -1,15 +1,15 @@
-const SINGAPORE_TIMEZONE = 'Asia/Singapore';
+const SINGAPORE_TIMEZONE = "Asia/Singapore";
 
-export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
 
-const dateTimeFormat = new Intl.DateTimeFormat('en-CA', {
+const dateTimeFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: SINGAPORE_TIMEZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
   hour12: false,
 });
 
@@ -19,7 +19,7 @@ export function getSingaporeNow(): Date {
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 
   return new Date(
-    `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+08:00`
+    `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+08:00`,
   );
 }
 
@@ -38,16 +38,16 @@ export function isValidDateInput(dateText: string): boolean {
 
 export function calculateNextDueDate(
   dueDateIso: string,
-  pattern: RecurrencePattern
+  pattern: RecurrencePattern,
 ): string {
   const current = new Date(dueDateIso);
   const next = new Date(current.getTime());
 
-  if (pattern === 'daily') {
+  if (pattern === "daily") {
     next.setUTCDate(next.getUTCDate() + 1);
-  } else if (pattern === 'weekly') {
+  } else if (pattern === "weekly") {
     next.setUTCDate(next.getUTCDate() + 7);
-  } else if (pattern === 'monthly') {
+  } else if (pattern === "monthly") {
     next.setUTCMonth(next.getUTCMonth() + 1);
   } else {
     next.setUTCFullYear(next.getUTCFullYear() + 1);

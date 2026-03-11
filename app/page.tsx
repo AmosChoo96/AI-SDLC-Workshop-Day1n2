@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Todo = {
   id: number;
   title: string;
   description: string | null;
-  priority: 'high' | 'medium' | 'low';
-  recurrence_pattern: 'daily' | 'weekly' | 'monthly' | 'yearly' | null;
+  priority: "high" | "medium" | "low";
+  recurrence_pattern: "daily" | "weekly" | "monthly" | "yearly" | null;
   due_date: string | null;
   completed: 0 | 1;
   created_at: string;
@@ -17,17 +17,17 @@ type Todo = {
 type TodoDraft = {
   title: string;
   description: string;
-  priority: 'high' | 'medium' | 'low';
-  recurrence_pattern: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  priority: "high" | "medium" | "low";
+  recurrence_pattern: "none" | "daily" | "weekly" | "monthly" | "yearly";
   due_date: string;
 };
 
 const emptyDraft: TodoDraft = {
-  title: '',
-  description: '',
-  priority: 'medium',
-  recurrence_pattern: 'none',
-  due_date: '',
+  title: "",
+  description: "",
+  priority: "medium",
+  recurrence_pattern: "none",
+  due_date: "",
 };
 
 function toLocalInputDateTime(isoText: string): string {
@@ -48,11 +48,13 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<
+    "all" | "high" | "medium" | "low"
+  >("all");
 
   const editingTodo = useMemo(
     () => todos.find((todo) => todo.id === editingId) ?? null,
-    [editingId, todos]
+    [editingId, todos],
   );
 
   useEffect(() => {
@@ -64,17 +66,22 @@ export default function Home() {
     setError(null);
 
     try {
-      const response = await fetch('/api/todos', { method: 'GET' });
-      const payload = (await response.json()) as { data?: Todo[]; error?: string };
+      const response = await fetch("/api/todos", { method: "GET" });
+      const payload = (await response.json()) as {
+        data?: Todo[];
+        error?: string;
+      };
 
       if (!response.ok) {
-        throw new Error(payload.error || 'Failed to fetch todos.');
+        throw new Error(payload.error || "Failed to fetch todos.");
       }
 
       setTodos(payload.data ?? []);
     } catch (fetchError) {
       setError(
-        fetchError instanceof Error ? fetchError.message : 'Failed to fetch todos.'
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Failed to fetch todos.",
       );
     } finally {
       setIsLoading(false);
@@ -90,10 +97,10 @@ export default function Home() {
     setEditingId(todo.id);
     setDraft({
       title: todo.title,
-      description: todo.description ?? '',
+      description: todo.description ?? "",
       priority: todo.priority,
-      recurrence_pattern: todo.recurrence_pattern ?? 'none',
-      due_date: todo.due_date ? toLocalInputDateTime(todo.due_date) : '',
+      recurrence_pattern: todo.recurrence_pattern ?? "none",
+      due_date: todo.due_date ? toLocalInputDateTime(todo.due_date) : "",
     });
     resetFeedback();
   }
@@ -107,15 +114,15 @@ export default function Home() {
     const trimmed = current.title.trim();
 
     if (!trimmed) {
-      return 'Title is required.';
+      return "Title is required.";
     }
 
     if (trimmed.length > 120) {
-      return 'Title must be 120 characters or less.';
+      return "Title must be 120 characters or less.";
     }
 
     if (current.description.length > 500) {
-      return 'Description must be 500 characters or less.';
+      return "Description must be 500 characters or less.";
     }
 
     return null;
@@ -137,7 +144,7 @@ export default function Home() {
       description: draft.description.trim() || null,
       priority: draft.priority,
       recurrence_pattern:
-        draft.recurrence_pattern === 'none' ? null : draft.recurrence_pattern,
+        draft.recurrence_pattern === "none" ? null : draft.recurrence_pattern,
       due_date: draft.due_date ? fromLocalInputDateTime(draft.due_date) : null,
       completed: 0,
       created_at: new Date().toISOString(),
@@ -150,9 +157,9 @@ export default function Home() {
     setDraft(emptyDraft);
 
     try {
-      const response = await fetch('/api/todos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: optimisticTodo.title,
           description: optimisticTodo.description,
@@ -169,17 +176,21 @@ export default function Home() {
       };
 
       if (!response.ok || !payload.data) {
-        throw new Error(payload.error || 'Failed to create todo.');
+        throw new Error(payload.error || "Failed to create todo.");
       }
 
       setTodos((current) =>
-        current.map((todo) => (todo.id === optimisticTodo.id ? payload.data! : todo))
+        current.map((todo) =>
+          todo.id === optimisticTodo.id ? payload.data! : todo,
+        ),
       );
-      setMessage('Todo created.');
+      setMessage("Todo created.");
     } catch (createError) {
       setTodos(previousTodos);
       setError(
-        createError instanceof Error ? createError.message : 'Failed to create todo.'
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create todo.",
       );
     } finally {
       setIsSubmitting(false);
@@ -194,36 +205,42 @@ export default function Home() {
 
     setTodos((current) =>
       current.map((item) =>
-        item.id === todo.id ? { ...item, completed: nextCompleted } : item
-      )
+        item.id === todo.id ? { ...item, completed: nextCompleted } : item,
+      ),
     );
 
     try {
       const response = await fetch(`/api/todos/${todo.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ completed: Boolean(nextCompleted) }),
       });
 
-      const payload = (await response.json()) as { data?: Todo; error?: string };
+      const payload = (await response.json()) as {
+        data?: Todo;
+        error?: string;
+      };
 
       if (!response.ok || !payload.data) {
-        throw new Error(payload.error || 'Failed to update todo.');
+        throw new Error(payload.error || "Failed to update todo.");
       }
-
-      setTodos((current) =>
-        current.map((item) => (item.id === todo.id ? payload.data! : item))
-      );
+        const payload = (await response.json()) as {
+          data?: Todo;
+          next_todo?: Todo;
+          error?: string;
+        };
 
       if (payload.next_todo) {
         setTodos((current) => [payload.next_todo as Todo, ...current]);
       }
 
-      setMessage('Todo updated.');
+      setMessage("Todo updated.");
     } catch (updateError) {
       setTodos(previousTodos);
       setError(
-        updateError instanceof Error ? updateError.message : 'Failed to update todo.'
+        updateError instanceof Error
+          ? updateError.message
+          : "Failed to update todo.",
       );
     }
   }
@@ -235,22 +252,29 @@ export default function Home() {
     setTodos((current) => current.filter((item) => item.id !== todo.id));
 
     try {
-      const response = await fetch(`/api/todos/${todo.id}`, { method: 'DELETE' });
-      const payload = (await response.json()) as { success?: boolean; error?: string };
+      const response = await fetch(`/api/todos/${todo.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+      };
 
       if (!response.ok || !payload.success) {
-        throw new Error(payload.error || 'Failed to delete todo.');
+        throw new Error(payload.error || "Failed to delete todo.");
       }
 
       if (editingId === todo.id) {
         stopEdit();
       }
 
-      setMessage('Todo deleted.');
+      setMessage("Todo deleted.");
     } catch (deleteError) {
       setTodos(previousTodos);
       setError(
-        deleteError instanceof Error ? deleteError.message : 'Failed to delete todo.'
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete todo.",
       );
     }
   }
@@ -277,20 +301,22 @@ export default function Home() {
       description: draft.description.trim() || null,
       priority: draft.priority,
       recurrence_pattern:
-        draft.recurrence_pattern === 'none' ? null : draft.recurrence_pattern,
+        draft.recurrence_pattern === "none" ? null : draft.recurrence_pattern,
       due_date: draft.due_date ? fromLocalInputDateTime(draft.due_date) : null,
       updated_at: new Date().toISOString(),
     };
 
     setTodos((current) =>
-      current.map((item) => (item.id === editingTodo.id ? optimisticUpdate : item))
+      current.map((item) =>
+        item.id === editingTodo.id ? optimisticUpdate : item,
+      ),
     );
     setIsSubmitting(true);
 
     try {
       const response = await fetch(`/api/todos/${editingTodo.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: optimisticUpdate.title,
           description: optimisticUpdate.description,
@@ -300,21 +326,28 @@ export default function Home() {
         }),
       });
 
-      const payload = (await response.json()) as { data?: Todo; error?: string };
+      const payload = (await response.json()) as {
+        data?: Todo;
+        error?: string;
+      };
 
       if (!response.ok || !payload.data) {
-        throw new Error(payload.error || 'Failed to update todo.');
+        throw new Error(payload.error || "Failed to update todo.");
       }
 
       setTodos((current) =>
-        current.map((item) => (item.id === editingTodo.id ? payload.data! : item))
+        current.map((item) =>
+          item.id === editingTodo.id ? payload.data! : item,
+        ),
       );
-      setMessage('Todo updated.');
+      setMessage("Todo updated.");
       stopEdit();
     } catch (updateError) {
       setTodos(previousTodos);
       setError(
-        updateError instanceof Error ? updateError.message : 'Failed to update todo.'
+        updateError instanceof Error
+          ? updateError.message
+          : "Failed to update todo.",
       );
     } finally {
       setIsSubmitting(false);
@@ -322,7 +355,7 @@ export default function Home() {
   }
 
   const visibleTodos =
-    priorityFilter === 'all'
+    priorityFilter === "all"
       ? todos
       : todos.filter((todo) => todo.priority === priorityFilter);
 
@@ -338,14 +371,20 @@ export default function Home() {
         </header>
 
         <section className="card stack">
-          <h2>{editingTodo ? 'Edit Todo' : 'Create Todo'}</h2>
-          <form className="stack" onSubmit={editingTodo ? handleSaveEdit : handleCreate}>
+          <h2>{editingTodo ? "Edit Todo" : "Create Todo"}</h2>
+          <form
+            className="stack"
+            onSubmit={editingTodo ? handleSaveEdit : handleCreate}
+          >
             <input
               placeholder="Title"
               value={draft.title}
               maxLength={120}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, title: event.target.value }))
+                setDraft((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
               }
             />
             <textarea
@@ -354,7 +393,10 @@ export default function Home() {
               maxLength={500}
               rows={3}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, description: event.target.value }))
+                setDraft((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
               }
             />
             <div className="field-block">
@@ -364,7 +406,7 @@ export default function Home() {
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
-                    priority: event.target.value as 'high' | 'medium' | 'low',
+                    priority: event.target.value as "high" | "medium" | "low",
                   }))
                 }
               >
@@ -381,11 +423,11 @@ export default function Home() {
                   setDraft((current) => ({
                     ...current,
                     recurrence_pattern: event.target.value as
-                      | 'none'
-                      | 'daily'
-                      | 'weekly'
-                      | 'monthly'
-                      | 'yearly',
+                      | "none"
+                      | "daily"
+                      | "weekly"
+                      | "monthly"
+                      | "yearly",
                   }))
                 }
               >
@@ -402,13 +444,16 @@ export default function Home() {
                 type="datetime-local"
                 value={draft.due_date}
                 onChange={(event) =>
-                  setDraft((current) => ({ ...current, due_date: event.target.value }))
+                  setDraft((current) => ({
+                    ...current,
+                    due_date: event.target.value,
+                  }))
                 }
               />
             </div>
             <div className="row">
               <button className="primary" type="submit" disabled={isSubmitting}>
-                {editingTodo ? 'Save Changes' : 'Add Todo'}
+                {editingTodo ? "Save Changes" : "Add Todo"}
               </button>
               {editingTodo ? (
                 <button
@@ -434,7 +479,7 @@ export default function Home() {
                 value={priorityFilter}
                 onChange={(event) =>
                   setPriorityFilter(
-                    event.target.value as 'all' | 'high' | 'medium' | 'low'
+                    event.target.value as "all" | "high" | "medium" | "low",
                   )
                 }
               >
@@ -458,7 +503,7 @@ export default function Home() {
           {visibleTodos.map((todo) => (
             <article
               key={todo.id}
-              className={`todo ${todo.completed ? 'done' : ''}`}
+              className={`todo ${todo.completed ? "done" : ""}`}
             >
               <div className="row between">
                 <div className="row">
@@ -472,7 +517,7 @@ export default function Home() {
                     className="secondary"
                     onClick={() => void handleToggle(todo)}
                   >
-                    {todo.completed ? 'Mark Incomplete' : 'Mark Complete'}
+                    {todo.completed ? "Mark Incomplete" : "Mark Complete"}
                   </button>
                   <button
                     className="secondary"
@@ -493,26 +538,26 @@ export default function Home() {
               {todo.description ? <p>{todo.description}</p> : null}
 
               <p className="muted">
-                Due:{' '}
+                Due:{" "}
                 {todo.due_date
-                  ? new Date(todo.due_date).toLocaleString('en-SG', {
-                      timeZone: 'Asia/Singapore',
+                  ? new Date(todo.due_date).toLocaleString("en-SG", {
+                      timeZone: "Asia/Singapore",
                     })
-                  : 'No due date'}
+                  : "No due date"}
               </p>
 
               <p className="muted">
-                Recurrence:{' '}
+                Recurrence:{" "}
                 {todo.recurrence_pattern
                   ? todo.recurrence_pattern[0].toUpperCase() +
                     todo.recurrence_pattern.slice(1)
-                  : 'None'}
+                  : "None"}
               </p>
 
               <p className="muted">
-                Updated:{' '}
-                {new Date(todo.updated_at).toLocaleString('en-SG', {
-                  timeZone: 'Asia/Singapore',
+                Updated:{" "}
+                {new Date(todo.updated_at).toLocaleString("en-SG", {
+                  timeZone: "Asia/Singapore",
                 })}
               </p>
             </article>

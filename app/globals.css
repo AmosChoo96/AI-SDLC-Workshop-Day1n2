@@ -9,7 +9,12 @@
 body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: radial-gradient(circle at top, #fff4e8 0%, #f8e7d8 42%, #f2dcc8 100%);
+  background: radial-gradient(
+    circle at top,
+    #fff4e8 0%,
+    #f8e7d8 42%,
+    #f2dcc8 100%
+  );
   color: #3b2414;
 }
 
