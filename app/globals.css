@@ -98,11 +98,102 @@ button:disabled {
   border-radius: 12px;
   padding: 0.9rem;
   background: #fff8f1;
+  overflow: hidden;
+  transition:
+    background-color 0.25s ease,
+    opacity 0.25s ease;
 }
 
 .todo.done {
   opacity: 0.75;
   background: #f4e8dc;
+}
+
+.todo-entering {
+  animation: todo-enter 0.45s ease-out;
+}
+
+.todo-completing {
+  animation: todo-complete 0.32s ease-out;
+}
+
+.todo-deleting {
+  animation: todo-delete 0.18s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes todo-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.99);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes todo-complete {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  100% {
+    transform: scale(0.992);
+    filter: brightness(0.97);
+  }
+}
+
+@keyframes todo-delete {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+}
+
+.todo-complete-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid #d6b693;
+  background: #fffefc;
+  color: #5d371e;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todo-complete-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.subtask-complete-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #d6b693;
+  border-radius: 0.5rem;
+  background: #fffefc;
+  color: #5d371e;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.subtask-complete-toggle input {
+  width: auto;
+  margin: 0;
 }
 
 .row {

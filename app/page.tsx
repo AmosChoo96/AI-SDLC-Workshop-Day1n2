@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -116,9 +123,13 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [enteringTodoIds, setEnteringTodoIds] = useState<number[]>([]);
+  const [completingTodoIds, setCompletingTodoIds] = useState<number[]>([]);
+  const [deletingTodoIds, setDeletingTodoIds] = useState<number[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<
     "all" | "high" | "medium" | "low"
   >("all");
+  const animationTimeoutsRef = useRef<number[]>([]);
 
   // ── Search & advanced filter state (HEAD) ────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,11 +185,14 @@ export default function Home() {
         data?: Todo[];
         error?: string;
       };
-      if (!response.ok) throw new Error(payload.error || "Failed to fetch todos.");
+      if (!response.ok)
+        throw new Error(payload.error || "Failed to fetch todos.");
       setTodos(payload.data ?? []);
     } catch (fetchError) {
       setError(
-        fetchError instanceof Error ? fetchError.message : "Failed to fetch todos.",
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Failed to fetch todos.",
       );
     } finally {
       setIsLoading(false);
@@ -190,7 +204,9 @@ export default function Home() {
       const response = await fetch("/api/tags");
       const payload = (await response.json()) as { data?: Tag[] };
       if (response.ok) setTags(payload.data ?? []);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function fetchTemplates() {
@@ -198,7 +214,9 @@ export default function Home() {
       const response = await fetch("/api/templates");
       const payload = (await response.json()) as { data?: Template[] };
       if (response.ok) setTemplates(payload.data ?? []);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function fetchSubtasks(todoId: number) {
@@ -208,7 +226,9 @@ export default function Home() {
       if (response.ok) {
         setSubtasksMap((prev) => ({ ...prev, [todoId]: payload.data ?? [] }));
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   useEffect(() => {
@@ -262,7 +282,9 @@ export default function Home() {
             body: JSON.stringify({ todo_id: todo.id }),
           });
         }
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }, 60000);
 
     return () => clearInterval(interval);
@@ -280,12 +302,66 @@ export default function Home() {
     return () => document.removeEventListener("click", requestPermission);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of animationTimeoutsRef.current) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
   // ── Helpers ──────────────────────────────────────────────────────────
 
   function resetFeedback() {
     setMessage(null);
     setError(null);
   }
+
+  const markTodoAsEntering = useCallback((todoId: number) => {
+    setEnteringTodoIds((current) =>
+      current.includes(todoId) ? current : [...current, todoId],
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      setEnteringTodoIds((current) => current.filter((id) => id !== todoId));
+      animationTimeoutsRef.current = animationTimeoutsRef.current.filter(
+        (id) => id !== timeoutId,
+      );
+    }, 450);
+
+    animationTimeoutsRef.current.push(timeoutId);
+  }, []);
+
+  const markTodoAsCompleting = useCallback((todoId: number) => {
+    setCompletingTodoIds((current) =>
+      current.includes(todoId) ? current : [...current, todoId],
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      setCompletingTodoIds((current) => current.filter((id) => id !== todoId));
+      animationTimeoutsRef.current = animationTimeoutsRef.current.filter(
+        (id) => id !== timeoutId,
+      );
+    }, 320);
+
+    animationTimeoutsRef.current.push(timeoutId);
+  }, []);
+
+  const markTodoAsDeleting = useCallback((todoId: number) => {
+    setDeletingTodoIds((current) =>
+      current.includes(todoId) ? current : [...current, todoId],
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      setTodos((current) => current.filter((item) => item.id !== todoId));
+      animationTimeoutsRef.current = animationTimeoutsRef.current.filter(
+        (id) => id !== timeoutId,
+      );
+    }, 180);
+
+    animationTimeoutsRef.current.push(timeoutId);
+    return timeoutId;
+  }, []);
 
   function startEdit(todo: Todo) {
     setEditingId(todo.id);
@@ -295,7 +371,9 @@ export default function Home() {
       priority: todo.priority,
       recurrence_pattern: todo.recurrence_pattern ?? "none",
       due_date: todo.due_date ? toLocalInputDateTime(todo.due_date) : "",
-      reminder_minutes: todo.reminder_minutes ? String(todo.reminder_minutes) : "none",
+      reminder_minutes: todo.reminder_minutes
+        ? String(todo.reminder_minutes)
+        : "none",
     });
     resetFeedback();
   }
@@ -309,7 +387,8 @@ export default function Home() {
     const trimmed = current.title.trim();
     if (!trimmed) return "Title is required.";
     if (trimmed.length > 120) return "Title must be 120 characters or less.";
-    if (current.description.length > 500) return "Description must be 500 characters or less.";
+    if (current.description.length > 500)
+      return "Description must be 500 characters or less.";
     return null;
   }
 
@@ -320,16 +399,21 @@ export default function Home() {
     resetFeedback();
 
     const validationError = validateDraft(draft);
-    if (validationError) { setError(validationError); return; }
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
-    const reminderMinutes = draft.reminder_minutes === "none" ? null : Number(draft.reminder_minutes);
+    const reminderMinutes =
+      draft.reminder_minutes === "none" ? null : Number(draft.reminder_minutes);
 
     const optimisticTodo: Todo = {
       id: -Date.now(),
       title: draft.title.trim(),
       description: draft.description.trim() || null,
       priority: draft.priority,
-      recurrence_pattern: draft.recurrence_pattern === "none" ? null : draft.recurrence_pattern,
+      recurrence_pattern:
+        draft.recurrence_pattern === "none" ? null : draft.recurrence_pattern,
       due_date: draft.due_date ? fromLocalInputDateTime(draft.due_date) : null,
       completed: 0,
       reminder_minutes: reminderMinutes,
@@ -357,26 +441,44 @@ export default function Home() {
         }),
       });
 
-      const payload = (await response.json()) as { data?: Todo; error?: string };
-      if (!response.ok || !payload.data) throw new Error(payload.error || "Failed to create todo.");
+      const payload = (await response.json()) as {
+        data?: Todo;
+        error?: string;
+      };
+      if (!response.ok || !payload.data)
+        throw new Error(payload.error || "Failed to create todo.");
 
-      setTodos((current) => current.map((todo) => (todo.id === optimisticTodo.id ? payload.data! : todo)));
+      setTodos((current) =>
+        current.map((todo) =>
+          todo.id === optimisticTodo.id ? payload.data! : todo,
+        ),
+      );
       setMessage("Todo created.");
     } catch (createError) {
       setTodos(previousTodos);
-      setError(createError instanceof Error ? createError.message : "Failed to create todo.");
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create todo.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleToggle(todo: Todo) {
-    resetFeedback();
+    setError(null);
     const previousTodos = todos;
     const nextCompleted = todo.completed ? 0 : 1;
 
+    if (todo.recurrence_pattern && nextCompleted === 1) {
+      markTodoAsCompleting(todo.id);
+    }
+
     setTodos((current) =>
-      current.map((item) => (item.id === todo.id ? { ...item, completed: nextCompleted } : item)),
+      current.map((item) =>
+        item.id === todo.id ? { ...item, completed: nextCompleted } : item,
+      ),
     );
 
     try {
@@ -386,15 +488,46 @@ export default function Home() {
         body: JSON.stringify({ completed: Boolean(nextCompleted) }),
       });
 
-      const payload = (await response.json()) as { data?: Todo; next_todo?: Todo; error?: string };
-      if (!response.ok || !payload.data) throw new Error(payload.error || "Failed to update todo.");
+      const payload = (await response.json()) as {
+        data?: Todo;
+        next_todo?: Todo;
+        error?: string;
+      };
+      if (!response.ok || !payload.data)
+        throw new Error(payload.error || "Failed to update todo.");
 
-      setTodos((current) => current.map((item) => (item.id === todo.id ? payload.data! : item)));
-      if (payload.next_todo) setTodos((current) => [payload.next_todo as Todo, ...current]);
-      setMessage("Todo updated.");
+      const nextTodo = payload.next_todo as Todo | undefined;
+
+      setTodos((current) => {
+        const updated = current.map((item) =>
+          item.id === todo.id ? payload.data! : item,
+        );
+
+        if (!nextTodo) {
+          return updated;
+        }
+
+        const currentTodoIndex = updated.findIndex(
+          (item) => item.id === todo.id,
+        );
+        if (currentTodoIndex === -1) {
+          return [nextTodo, ...updated];
+        }
+
+        const withNext = [...updated];
+        withNext.splice(currentTodoIndex + 1, 0, nextTodo);
+        return withNext;
+      });
+      if (nextTodo) {
+        markTodoAsEntering(nextTodo.id);
+      }
     } catch (updateError) {
       setTodos(previousTodos);
-      setError(updateError instanceof Error ? updateError.message : "Failed to update todo.");
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Failed to update todo.",
+      );
     }
   }
 
@@ -404,14 +537,24 @@ export default function Home() {
     setTodos((current) => current.filter((item) => item.id !== todo.id));
 
     try {
-      const response = await fetch(`/api/todos/${todo.id}`, { method: "DELETE" });
-      const payload = (await response.json()) as { success?: boolean; error?: string };
-      if (!response.ok || !payload.success) throw new Error(payload.error || "Failed to delete todo.");
+      const response = await fetch(`/api/todos/${todo.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !payload.success)
+        throw new Error(payload.error || "Failed to delete todo.");
       if (editingId === todo.id) stopEdit();
       setMessage("Todo deleted.");
     } catch (deleteError) {
       setTodos(previousTodos);
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete todo.");
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete todo.",
+      );
     }
   }
 
@@ -421,9 +564,13 @@ export default function Home() {
     resetFeedback();
 
     const validationError = validateDraft(draft);
-    if (validationError) { setError(validationError); return; }
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
-    const reminderMinutes = draft.reminder_minutes === "none" ? null : Number(draft.reminder_minutes);
+    const reminderMinutes =
+      draft.reminder_minutes === "none" ? null : Number(draft.reminder_minutes);
 
     const previousTodos = todos;
     const optimisticUpdate: Todo = {
@@ -431,13 +578,18 @@ export default function Home() {
       title: draft.title.trim(),
       description: draft.description.trim() || null,
       priority: draft.priority,
-      recurrence_pattern: draft.recurrence_pattern === "none" ? null : draft.recurrence_pattern,
+      recurrence_pattern:
+        draft.recurrence_pattern === "none" ? null : draft.recurrence_pattern,
       due_date: draft.due_date ? fromLocalInputDateTime(draft.due_date) : null,
       reminder_minutes: reminderMinutes,
       updated_at: new Date().toISOString(),
     };
 
-    setTodos((current) => current.map((item) => (item.id === editingTodo.id ? optimisticUpdate : item)));
+    setTodos((current) =>
+      current.map((item) =>
+        item.id === editingTodo.id ? optimisticUpdate : item,
+      ),
+    );
     setIsSubmitting(true);
 
     try {
@@ -454,15 +606,27 @@ export default function Home() {
         }),
       });
 
-      const payload = (await response.json()) as { data?: Todo; error?: string };
-      if (!response.ok || !payload.data) throw new Error(payload.error || "Failed to update todo.");
+      const payload = (await response.json()) as {
+        data?: Todo;
+        error?: string;
+      };
+      if (!response.ok || !payload.data)
+        throw new Error(payload.error || "Failed to update todo.");
 
-      setTodos((current) => current.map((item) => (item.id === editingTodo.id ? payload.data! : item)));
+      setTodos((current) =>
+        current.map((item) =>
+          item.id === editingTodo.id ? payload.data! : item,
+        ),
+      );
       setMessage("Todo updated.");
       stopEdit();
     } catch (updateError) {
       setTodos(previousTodos);
-      setError(updateError instanceof Error ? updateError.message : "Failed to update todo.");
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Failed to update todo.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -555,7 +719,9 @@ export default function Home() {
         setNewSubtaskTitle("");
         await fetchSubtasks(todoId);
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleToggleSubtask(todoId: number, subtask: Subtask) {
@@ -566,14 +732,20 @@ export default function Home() {
         body: JSON.stringify({ completed: !subtask.completed }),
       });
       await fetchSubtasks(todoId);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleDeleteSubtask(todoId: number, subtaskId: number) {
     try {
-      await fetch(`/api/todos/${todoId}/subtasks/${subtaskId}`, { method: "DELETE" });
+      await fetch(`/api/todos/${todoId}/subtasks/${subtaskId}`, {
+        method: "DELETE",
+      });
       await fetchSubtasks(todoId);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   // ── Tag handlers ─────────────────────────────────────────────────────
@@ -592,7 +764,9 @@ export default function Home() {
         setNewTagName("");
         await fetchTags();
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleDeleteTag(tagId: number) {
@@ -606,7 +780,9 @@ export default function Home() {
         }
         return next;
       });
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleAddTagToTodo(todoId: number, tagId: number) {
@@ -620,10 +796,15 @@ export default function Home() {
       if (tag) {
         setTodoTagsMap((prev) => ({
           ...prev,
-          [todoId]: [...(prev[todoId] ?? []).filter((t) => t.id !== tagId), tag],
+          [todoId]: [
+            ...(prev[todoId] ?? []).filter((t) => t.id !== tagId),
+            tag,
+          ],
         }));
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleRemoveTagFromTodo(todoId: number, tagId: number) {
@@ -633,7 +814,9 @@ export default function Home() {
         ...prev,
         [todoId]: (prev[todoId] ?? []).filter((t) => t.id !== tagId),
       }));
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   // ── Template handlers ───────────────────────────────────────────────
@@ -662,29 +845,46 @@ export default function Home() {
         }),
       });
       if (response.ok) {
-        setTemplateDraft({ title: "", description: "", priority: "medium", subtasks: "", due_date_offset_days: "" });
+        setTemplateDraft({
+          title: "",
+          description: "",
+          priority: "medium",
+          subtasks: "",
+          due_date_offset_days: "",
+        });
         await fetchTemplates();
         setMessage("Template created.");
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleUseTemplate(templateId: number) {
     try {
-      const response = await fetch(`/api/templates/${templateId}/use`, { method: "POST" });
-      const payload = (await response.json()) as { data?: Todo; error?: string };
+      const response = await fetch(`/api/templates/${templateId}/use`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        data?: Todo;
+        error?: string;
+      };
       if (response.ok && payload.data) {
         await fetchTodos();
         setMessage("Todo created from template.");
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function handleDeleteTemplate(templateId: number) {
     try {
       await fetch(`/api/templates/${templateId}`, { method: "DELETE" });
       await fetchTemplates();
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   // ── Filter preset handlers (HEAD) ───────────────────────────────────
@@ -725,7 +925,11 @@ export default function Home() {
   }
 
   const hasActiveFilters =
-    searchQuery || priorityFilter !== "all" || completionFilter !== "all" || dateFrom || dateTo;
+    searchQuery ||
+    priorityFilter !== "all" ||
+    completionFilter !== "all" ||
+    dateFrom ||
+    dateTo;
 
   function clearAllFilters() {
     setSearchQuery("");
@@ -790,7 +994,16 @@ export default function Home() {
     }
 
     return filtered;
-  }, [todos, priorityFilter, searchQuery, completionFilter, dateFrom, dateTo, tagFilter, todoTagsMap]);
+  }, [
+    todos,
+    priorityFilter,
+    searchQuery,
+    completionFilter,
+    dateFrom,
+    dateTo,
+    tagFilter,
+    todoTagsMap,
+  ]);
 
   // ── Subtask progress helpers ─────────────────────────────────────────
 
@@ -798,7 +1011,11 @@ export default function Home() {
     const subs = subtasksMap[todoId];
     if (!subs || subs.length === 0) return null;
     const done = subs.filter((s) => s.completed).length;
-    return { done, total: subs.length, percent: Math.round((done / subs.length) * 100) };
+    return {
+      done,
+      total: subs.length,
+      percent: Math.round((done / subs.length) * 100),
+    };
   }
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -811,15 +1028,18 @@ export default function Home() {
             <div>
               <h1>Todo App</h1>
               <p className="muted">
-                Full-featured todo manager with priorities, recurrence, reminders,
-                subtasks, tags, templates, and calendar view.
+                Full-featured todo manager with priorities, recurrence,
+                reminders, subtasks, tags, templates, and calendar view.
               </p>
             </div>
             <div className="row">
               <Link href="/calendar">
                 <button className="secondary">📅 Calendar</button>
               </Link>
-              <button className="secondary" onClick={() => handleExport("json")}>
+              <button
+                className="secondary"
+                onClick={() => handleExport("json")}
+              >
                 Export JSON
               </button>
               <button className="secondary" onClick={() => handleExport("csv")}>
@@ -882,14 +1102,20 @@ export default function Home() {
                       height: 28,
                       borderRadius: "50%",
                       background: c,
-                      border: c === newTagColor ? "3px solid #3b2414" : "2px solid transparent",
+                      border:
+                        c === newTagColor
+                          ? "3px solid #3b2414"
+                          : "2px solid transparent",
                       padding: 0,
                       minWidth: 0,
                     }}
                   />
                 ))}
               </div>
-              <button className="primary" onClick={() => void handleCreateTag()}>
+              <button
+                className="primary"
+                onClick={() => void handleCreateTag()}
+              >
                 Add Tag
               </button>
             </div>
@@ -898,7 +1124,11 @@ export default function Home() {
                 <span
                   key={tag.id}
                   className="badge"
-                  style={{ background: tag.color + "22", color: tag.color, border: `1px solid ${tag.color}` }}
+                  style={{
+                    background: tag.color + "22",
+                    color: tag.color,
+                    border: `1px solid ${tag.color}`,
+                  }}
                 >
                   {tag.name}
                   <button
@@ -930,14 +1160,21 @@ export default function Home() {
                 placeholder="Template title"
                 value={templateDraft.title}
                 maxLength={120}
-                onChange={(e) => setTemplateDraft({ ...templateDraft, title: e.target.value })}
+                onChange={(e) =>
+                  setTemplateDraft({ ...templateDraft, title: e.target.value })
+                }
               />
               <textarea
                 placeholder="Description (optional)"
                 value={templateDraft.description}
                 maxLength={500}
                 rows={2}
-                onChange={(e) => setTemplateDraft({ ...templateDraft, description: e.target.value })}
+                onChange={(e) =>
+                  setTemplateDraft({
+                    ...templateDraft,
+                    description: e.target.value,
+                  })
+                }
               />
               <div className="row">
                 <select
@@ -960,7 +1197,10 @@ export default function Home() {
                   value={templateDraft.due_date_offset_days}
                   min="0"
                   onChange={(e) =>
-                    setTemplateDraft({ ...templateDraft, due_date_offset_days: e.target.value })
+                    setTemplateDraft({
+                      ...templateDraft,
+                      due_date_offset_days: e.target.value,
+                    })
                   }
                   style={{ flex: 1 }}
                 />
@@ -969,33 +1209,55 @@ export default function Home() {
                 placeholder="Subtasks (one per line)"
                 value={templateDraft.subtasks}
                 rows={3}
-                onChange={(e) => setTemplateDraft({ ...templateDraft, subtasks: e.target.value })}
+                onChange={(e) =>
+                  setTemplateDraft({
+                    ...templateDraft,
+                    subtasks: e.target.value,
+                  })
+                }
               />
-              <button className="primary" onClick={() => void handleCreateTemplate()}>
+              <button
+                className="primary"
+                onClick={() => void handleCreateTemplate()}
+              >
                 Save Template
               </button>
             </div>
             {templates.map((tmpl) => {
               const subs = (() => {
-                try { return JSON.parse(tmpl.subtasks_json) as { title: string }[]; } catch { return []; }
+                try {
+                  return JSON.parse(tmpl.subtasks_json) as { title: string }[];
+                } catch {
+                  return [];
+                }
               })();
               return (
                 <article key={tmpl.id} className="todo">
                   <div className="row between">
                     <div className="row">
                       <h3>{tmpl.title}</h3>
-                      <span className={`badge ${tmpl.priority}`}>{tmpl.priority.toUpperCase()}</span>
+                      <span className={`badge ${tmpl.priority}`}>
+                        {tmpl.priority.toUpperCase()}
+                      </span>
                     </div>
                     <div className="row">
-                      <button className="primary" onClick={() => void handleUseTemplate(tmpl.id)}>
+                      <button
+                        className="primary"
+                        onClick={() => void handleUseTemplate(tmpl.id)}
+                      >
                         Use
                       </button>
-                      <button className="danger" onClick={() => void handleDeleteTemplate(tmpl.id)}>
+                      <button
+                        className="danger"
+                        onClick={() => void handleDeleteTemplate(tmpl.id)}
+                      >
                         Delete
                       </button>
                     </div>
                   </div>
-                  {tmpl.description && <p className="muted">{tmpl.description}</p>}
+                  {tmpl.description && (
+                    <p className="muted">{tmpl.description}</p>
+                  )}
                   <p className="muted">
                     Offset: {tmpl.due_date_offset_days ?? "None"} days
                     {subs.length > 0 ? ` · ${subs.length} subtask(s)` : ""}
@@ -1003,7 +1265,9 @@ export default function Home() {
                 </article>
               );
             })}
-            {templates.length === 0 && <p className="muted">No templates yet.</p>}
+            {templates.length === 0 && (
+              <p className="muted">No templates yet.</p>
+            )}
           </section>
         )}
 
@@ -1019,7 +1283,10 @@ export default function Home() {
               value={draft.title}
               maxLength={120}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, title: event.target.value }))
+                setDraft((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
               }
             />
             <textarea
@@ -1028,7 +1295,10 @@ export default function Home() {
               maxLength={500}
               rows={3}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, description: event.target.value }))
+                setDraft((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
               }
             />
             <div className="field-block">
@@ -1055,7 +1325,11 @@ export default function Home() {
                   setDraft((current) => ({
                     ...current,
                     recurrence_pattern: event.target.value as
-                      | "none" | "daily" | "weekly" | "monthly" | "yearly",
+                      | "none"
+                      | "daily"
+                      | "weekly"
+                      | "monthly"
+                      | "yearly",
                   }))
                 }
               >
@@ -1072,7 +1346,10 @@ export default function Home() {
                 type="datetime-local"
                 value={draft.due_date}
                 onChange={(event) =>
-                  setDraft((current) => ({ ...current, due_date: event.target.value }))
+                  setDraft((current) => ({
+                    ...current,
+                    due_date: event.target.value,
+                  }))
                 }
               />
             </div>
@@ -1081,11 +1358,16 @@ export default function Home() {
               <select
                 value={draft.reminder_minutes}
                 onChange={(event) =>
-                  setDraft((current) => ({ ...current, reminder_minutes: event.target.value }))
+                  setDraft((current) => ({
+                    ...current,
+                    reminder_minutes: event.target.value,
+                  }))
                 }
               >
                 {Object.entries(REMINDER_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1117,7 +1399,9 @@ export default function Home() {
               <select
                 value={priorityFilter}
                 onChange={(event) =>
-                  setPriorityFilter(event.target.value as "all" | "high" | "medium" | "low")
+                  setPriorityFilter(
+                    event.target.value as "all" | "high" | "medium" | "low",
+                  )
                 }
               >
                 <option value="all">All Priorities</option>
@@ -1128,11 +1412,15 @@ export default function Home() {
               {tags.length > 0 && (
                 <select
                   value={tagFilter ?? ""}
-                  onChange={(e) => setTagFilter(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) =>
+                    setTagFilter(e.target.value ? Number(e.target.value) : null)
+                  }
                 >
                   <option value="">All Tags</option>
                   {tags.map((tag) => (
-                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                    <option key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </option>
                   ))}
                 </select>
               )}
@@ -1195,7 +1483,9 @@ export default function Home() {
               <div className="row between">
                 <div className="row">
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", marginBottom: "0.25rem" }}>
+                    <label
+                      style={{ display: "block", marginBottom: "0.25rem" }}
+                    >
                       Completion Status
                     </label>
                     <select
@@ -1215,7 +1505,9 @@ export default function Home() {
 
                 <div className="row">
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", marginBottom: "0.25rem" }}>
+                    <label
+                      style={{ display: "block", marginBottom: "0.25rem" }}
+                    >
                       Due Date From
                     </label>
                     <input
@@ -1226,7 +1518,9 @@ export default function Home() {
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", marginBottom: "0.25rem" }}>
+                    <label
+                      style={{ display: "block", marginBottom: "0.25rem" }}
+                    >
                       Due Date To
                     </label>
                     <input
@@ -1239,11 +1533,26 @@ export default function Home() {
               </div>
 
               {presets.length > 0 && (
-                <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #D1D5DB" }}>
-                  <p style={{ fontSize: "0.875rem", marginBottom: "0.5rem", color: "#6B7280" }}>
+                <div
+                  style={{
+                    marginTop: "1rem",
+                    paddingTop: "1rem",
+                    borderTop: "1px solid #D1D5DB",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "0.875rem",
+                      marginBottom: "0.5rem",
+                      color: "#6B7280",
+                    }}
+                  >
                     Saved Filter Presets
                   </p>
-                  <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+                  <div
+                    className="row"
+                    style={{ gap: "0.5rem", flexWrap: "wrap" }}
+                  >
                     {presets.map((preset) => (
                       <div
                         key={preset.name}
@@ -1258,7 +1567,10 @@ export default function Home() {
                       >
                         <button
                           className="secondary"
-                          style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem" }}
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            fontSize: "0.875rem",
+                          }}
                           onClick={() => applyPreset(preset)}
                         >
                           {preset.name}
@@ -1334,39 +1646,71 @@ export default function Home() {
             return (
               <article
                 key={todo.id}
-                className={`todo ${todo.completed ? "done" : ""}`}
+                className={`todo ${todo.completed ? "done" : ""} ${enteringTodoIds.includes(todo.id) ? "todo-entering" : ""} ${completingTodoIds.includes(todo.id) ? "todo-completing" : ""} ${deletingTodoIds.includes(todo.id) ? "todo-deleting" : ""}`}
               >
                 <div className="row between">
                   <div className="row">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(todo.completed)}
-                      onChange={() => void handleToggle(todo)}
-                      style={{ marginRight: "0.5rem" }}
-                    />
                     <h3 style={{ margin: 0 }}>{todo.title}</h3>
                     <span className={`badge ${todo.priority}`}>
                       {todo.priority.toUpperCase()}
                     </span>
                     {todo.reminder_minutes && (
-                      <span className="badge" style={{ background: "#dbeafe", color: "#1e40af", border: "1px solid #93c5fd" }}>
-                        🔔 {REMINDER_LABELS[String(todo.reminder_minutes)] ?? `${todo.reminder_minutes}m`}
+                      <span
+                        className="badge"
+                        style={{
+                          background: "#dbeafe",
+                          color: "#1e40af",
+                          border: "1px solid #93c5fd",
+                        }}
+                      >
+                        🔔{" "}
+                        {REMINDER_LABELS[String(todo.reminder_minutes)] ??
+                          `${todo.reminder_minutes}m`}
                       </span>
                     )}
                     {todo.recurrence_pattern && (
-                      <span className="badge" style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #86efac" }}>
+                      <span
+                        className="badge"
+                        style={{
+                          background: "#f0fdf4",
+                          color: "#166534",
+                          border: "1px solid #86efac",
+                        }}
+                      >
                         🔄 {todo.recurrence_pattern}
                       </span>
                     )}
                   </div>
                   <div className="row">
-                    <button className="secondary" onClick={() => startEdit(todo)} disabled={editingId === todo.id}>
+                    <label
+                      className="todo-complete-toggle"
+                      title="Toggle completion"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(todo.completed)}
+                        onChange={() => void handleToggle(todo)}
+                        aria-label={`Mark ${todo.title} as completed`}
+                      />
+                      <span>{todo.completed ? "Done" : "Complete"}</span>
+                    </label>
+                    <button
+                      className="secondary"
+                      onClick={() => startEdit(todo)}
+                      disabled={editingId === todo.id}
+                    >
                       Edit
                     </button>
-                    <button className="secondary" onClick={() => toggleExpand(todo.id)}>
+                    <button
+                      className="secondary"
+                      onClick={() => toggleExpand(todo.id)}
+                    >
                       {isExpanded ? "Hide" : "Subtasks"}
                     </button>
-                    <button className="danger" onClick={() => void handleDelete(todo)}>
+                    <button
+                      className="danger"
+                      onClick={() => void handleDelete(todo)}
+                    >
                       Delete
                     </button>
                   </div>
@@ -1381,14 +1725,24 @@ export default function Home() {
                       <span
                         key={tag.id}
                         className="badge"
-                        style={{ background: tag.color + "22", color: tag.color, border: `1px solid ${tag.color}` }}
+                        style={{
+                          background: tag.color + "22",
+                          color: tag.color,
+                          border: `1px solid ${tag.color}`,
+                        }}
                       >
                         {tag.name}
                         <button
-                          onClick={() => void handleRemoveTagFromTodo(todo.id, tag.id)}
+                          onClick={() =>
+                            void handleRemoveTagFromTodo(todo.id, tag.id)
+                          }
                           style={{
-                            background: "none", border: "none", color: tag.color,
-                            cursor: "pointer", padding: "0 0 0 4px", fontSize: "0.8rem",
+                            background: "none",
+                            border: "none",
+                            color: tag.color,
+                            cursor: "pointer",
+                            padding: "0 0 0 4px",
+                            fontSize: "0.8rem",
                           }}
                         >
                           ×
@@ -1405,7 +1759,10 @@ export default function Home() {
                       defaultValue=""
                       onChange={(e) => {
                         if (e.target.value) {
-                          void handleAddTagToTodo(todo.id, Number(e.target.value));
+                          void handleAddTagToTodo(
+                            todo.id,
+                            Number(e.target.value),
+                          );
                           e.target.value = "";
                         }
                       }}
@@ -1415,7 +1772,9 @@ export default function Home() {
                       {tags
                         .filter((t) => !todoTags.some((tt) => tt.id === t.id))
                         .map((tag) => (
-                          <option key={tag.id} value={tag.id}>{tag.name}</option>
+                          <option key={tag.id} value={tag.id}>
+                            {tag.name}
+                          </option>
                         ))}
                     </select>
                   </div>
@@ -1447,30 +1806,67 @@ export default function Home() {
                         }}
                       />
                     </div>
-                    <p className="muted" style={{ fontSize: "0.75rem", marginTop: 2 }}>
-                      {progress.done}/{progress.total} subtasks ({progress.percent}%)
+                    <p
+                      className="muted"
+                      style={{ fontSize: "0.75rem", marginTop: 2 }}
+                    >
+                      {progress.done}/{progress.total} subtasks (
+                      {progress.percent}%)
                     </p>
                   </div>
                 )}
 
                 {/* Subtask panel */}
                 {isExpanded && (
-                  <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: "2px solid #e6c9ab" }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      paddingLeft: 8,
+                      borderLeft: "2px solid #e6c9ab",
+                    }}
+                  >
                     {(subtasksMap[todo.id] ?? []).map((sub) => (
-                      <div key={sub.id} className="row" style={{ gap: "0.4rem", padding: "0.2rem 0" }}>
-                        <input
-                          type="checkbox"
-                          checked={!!sub.completed}
-                          onChange={() => void handleToggleSubtask(todo.id, sub)}
-                        />
-                        <span style={{ flex: 1, textDecoration: sub.completed ? "line-through" : "none", opacity: sub.completed ? 0.6 : 1 }}>
+                      <div
+                        key={sub.id}
+                        className="row"
+                        style={{ gap: "0.4rem", padding: "0.2rem 0" }}
+                      >
+                        <span
+                          style={{
+                            flex: 1,
+                            textDecoration: sub.completed
+                              ? "line-through"
+                              : "none",
+                            opacity: sub.completed ? 0.6 : 1,
+                          }}
+                        >
                           {sub.title}
                         </span>
+                        <label
+                          className="subtask-complete-toggle"
+                          title="Toggle subtask completion"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!sub.completed}
+                            onChange={() =>
+                              void handleToggleSubtask(todo.id, sub)
+                            }
+                            aria-label={`Mark subtask ${sub.title} as completed`}
+                          />
+                          <span>{sub.completed ? "Done" : "Complete"}</span>
+                        </label>
                         <button
-                          onClick={() => void handleDeleteSubtask(todo.id, sub.id)}
+                          onClick={() =>
+                            void handleDeleteSubtask(todo.id, sub.id)
+                          }
                           style={{
-                            background: "none", border: "none", color: "#a9442f",
-                            cursor: "pointer", padding: 0, fontSize: "0.9rem",
+                            background: "none",
+                            border: "none",
+                            color: "#a9442f",
+                            cursor: "pointer",
+                            padding: 0,
+                            fontSize: "0.9rem",
                           }}
                         >
                           ×
@@ -1483,13 +1879,25 @@ export default function Home() {
                         value={newSubtaskTitle}
                         maxLength={200}
                         onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddSubtask(todo.id); } }}
-                        style={{ flex: 1, fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleAddSubtask(todo.id);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          fontSize: "0.85rem",
+                          padding: "0.35rem 0.5rem",
+                        }}
                       />
                       <button
                         className="secondary"
                         onClick={() => void handleAddSubtask(todo.id)}
-                        style={{ fontSize: "0.8rem", padding: "0.35rem 0.6rem" }}
+                        style={{
+                          fontSize: "0.8rem",
+                          padding: "0.35rem 0.6rem",
+                        }}
                       >
                         Add
                       </button>
@@ -1508,13 +1916,17 @@ export default function Home() {
 
                 {todo.recurrence_pattern && (
                   <p className="muted">
-                    Recurrence: {todo.recurrence_pattern[0].toUpperCase() + todo.recurrence_pattern.slice(1)}
+                    Recurrence:{" "}
+                    {todo.recurrence_pattern[0].toUpperCase() +
+                      todo.recurrence_pattern.slice(1)}
                   </p>
                 )}
 
                 <p className="muted">
                   Updated:{" "}
-                  {new Date(todo.updated_at).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}
+                  {new Date(todo.updated_at).toLocaleString("en-SG", {
+                    timeZone: "Asia/Singapore",
+                  })}
                 </p>
               </article>
             );
