@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -105,6 +106,8 @@ function fromLocalInputDateTime(localText: string): string {
 }
 
 export default function Home() {
+  const router = useRouter();
+
   // ── Todo state ───────────────────────────────────────────────────────
   const [todos, setTodos] = useState<Todo[]>([]);
   const [draft, setDraft] = useState<TodoDraft>(emptyDraft);
@@ -824,6 +827,16 @@ export default function Home() {
               </button>
               <button className="secondary" onClick={handleImport}>
                 Import
+              </button>
+              <button
+                className="secondary"
+                style={{ background: "#ef4444", color: "white" }}
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  router.push("/login");
+                }}
+              >
+                Logout
               </button>
             </div>
           </div>

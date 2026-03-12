@@ -66,11 +66,36 @@ db.exec(`
   );
 `);
 
+// ── Auth tables ────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    current_challenge TEXT,
+    created_at TEXT NOT NULL
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS authenticators (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    credential_id TEXT NOT NULL UNIQUE,
+    credential_public_key TEXT NOT NULL,
+    counter INTEGER NOT NULL DEFAULT 0,
+    transports TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
 // Migrations for existing databases
 try { db.exec(`ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';`); } catch { /* exists */ }
 try { db.exec(`ALTER TABLE todos ADD COLUMN recurrence_pattern TEXT;`); } catch { /* exists */ }
 try { db.exec(`ALTER TABLE todos ADD COLUMN reminder_minutes INTEGER;`); } catch { /* exists */ }
 try { db.exec(`ALTER TABLE todos ADD COLUMN last_notification_sent TEXT;`); } catch { /* exists */ }
+try { db.exec(`ALTER TABLE todos ADD COLUMN user_id INTEGER REFERENCES users(id);`); } catch { /* exists */ }
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -574,5 +599,103 @@ export const templateDB = {
 
   delete(id: number): boolean {
     return deleteTemplateStmt.run(id).changes > 0;
+  },
+};
+
+// ── User & Authenticator types ─────────────────────────────────────────
+
+export type User = {
+  id: number;
+  username: string;
+  current_challenge: string | null;
+  created_at: string;
+};
+
+export type Authenticator = {
+  id: number;
+  user_id: number;
+  credential_id: string;
+  credential_public_key: string;
+  counter: number;
+  transports: string | null;
+  created_at: string;
+};
+
+// ── User prepared statements & CRUD ────────────────────────────────────
+
+const userByIdStmt = db.prepare(`SELECT * FROM users WHERE id = ?;`);
+const userByUsernameStmt = db.prepare(`SELECT * FROM users WHERE username = ?;`);
+const createUserStmt = db.prepare(
+  `INSERT INTO users (username, current_challenge, created_at) VALUES (?, ?, ?);`,
+);
+const updateChallengeStmt = db.prepare(
+  `UPDATE users SET current_challenge = ? WHERE id = ?;`,
+);
+
+export const userDB = {
+  getById(id: number): User | undefined {
+    return userByIdStmt.get(id) as User | undefined;
+  },
+
+  getByUsername(username: string): User | undefined {
+    return userByUsernameStmt.get(username) as User | undefined;
+  },
+
+  create(username: string, nowIso: string): User {
+    const result = createUserStmt.run(username, null, nowIso);
+    return this.getById(Number(result.lastInsertRowid)) as User;
+  },
+
+  setChallenge(userId: number, challenge: string | null): void {
+    updateChallengeStmt.run(challenge, userId);
+  },
+};
+
+// ── Authenticator prepared statements & CRUD ───────────────────────────
+
+const authsByUserStmt = db.prepare(
+  `SELECT * FROM authenticators WHERE user_id = ?;`,
+);
+const authByCredIdStmt = db.prepare(
+  `SELECT * FROM authenticators WHERE credential_id = ?;`,
+);
+const createAuthStmt = db.prepare(
+  `INSERT INTO authenticators (user_id, credential_id, credential_public_key, counter, transports, created_at)
+   VALUES (?, ?, ?, ?, ?, ?);`,
+);
+const updateAuthCounterStmt = db.prepare(
+  `UPDATE authenticators SET counter = ? WHERE id = ?;`,
+);
+
+export const authenticatorDB = {
+  getByUserId(userId: number): Authenticator[] {
+    return authsByUserStmt.all(userId) as Authenticator[];
+  },
+
+  getByCredentialId(credentialId: string): Authenticator | undefined {
+    return authByCredIdStmt.get(credentialId) as Authenticator | undefined;
+  },
+
+  create(
+    userId: number,
+    credentialId: string,
+    publicKey: string,
+    counter: number,
+    transports: string | null,
+    nowIso: string,
+  ): Authenticator {
+    const result = createAuthStmt.run(
+      userId,
+      credentialId,
+      publicKey,
+      counter,
+      transports,
+      nowIso,
+    );
+    return authByCredIdStmt.get(credentialId) as Authenticator;
+  },
+
+  updateCounter(id: number, counter: number): void {
+    updateAuthCounterStmt.run(counter, id);
   },
 };
