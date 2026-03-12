@@ -126,6 +126,7 @@ export default function Home() {
   const [enteringTodoIds, setEnteringTodoIds] = useState<number[]>([]);
   const [completingTodoIds, setCompletingTodoIds] = useState<number[]>([]);
   const [deletingTodoIds, setDeletingTodoIds] = useState<number[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<
     "all" | "high" | "medium" | "low"
   >("all");
@@ -237,6 +238,23 @@ export default function Home() {
     void fetchTemplates();
     loadPresets();
   }, [fetchTodos]);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("themeMode");
+    if (savedTheme === "dark") {
+      setIsDarkMode(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add("dark-mode");
+      localStorage.setItem("themeMode", "dark");
+    } else {
+      document.body.classList.remove("dark-mode");
+      localStorage.setItem("themeMode", "light");
+    }
+  }, [isDarkMode]);
 
   function loadPresets() {
     try {
@@ -1273,7 +1291,22 @@ export default function Home() {
 
         {/* ── Create / Edit Form ──────────────────────────────────── */}
         <section className="card stack">
-          <h2>{editingTodo ? "Edit Todo" : "Create Todo"}</h2>
+          <div className="row between">
+            <h2>{editingTodo ? "Edit Todo" : "Create Todo"}</h2>
+            <button
+              type="button"
+              className="secondary theme-toggle"
+              onClick={() => setIsDarkMode((current) => !current)}
+              aria-label={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
+              title={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
+            >
+              {isDarkMode ? "☀" : "☾"}
+            </button>
+          </div>
           <form
             className="stack"
             onSubmit={editingTodo ? handleSaveEdit : handleCreate}

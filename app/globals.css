@@ -18,6 +18,16 @@ body {
   color: #3b2414;
 }
 
+body.dark-mode {
+  background: radial-gradient(
+    circle at top,
+    #252133 0%,
+    #1f1a2b 45%,
+    #171323 100%
+  );
+  color: #f3ecff;
+}
+
 main {
   min-height: 100vh;
 }
@@ -34,6 +44,12 @@ main {
   border-radius: 14px;
   box-shadow: 0 14px 35px rgba(84, 46, 18, 0.1);
   padding: 1rem;
+}
+
+body.dark-mode .card {
+  background: #221c33;
+  border-color: #4f4468;
+  box-shadow: 0 14px 35px rgba(10, 7, 18, 0.45);
 }
 
 .stack {
@@ -65,6 +81,14 @@ select {
   color: #3b2414;
 }
 
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  border-color: #5d4d7d;
+  background: #2b2440;
+  color: #f3ecff;
+}
+
 button {
   border: none;
   border-radius: 10px;
@@ -81,6 +105,11 @@ button.primary {
 button.secondary {
   background: #f0dcc7;
   color: #5d371e;
+}
+
+body.dark-mode button.secondary {
+  background: #3a3153;
+  color: #f3ecff;
 }
 
 button.danger {
@@ -210,6 +239,22 @@ button:disabled {
 .muted {
   color: #7a5236;
   font-size: 0.9rem;
+}
+
+body.dark-mode .muted,
+body.dark-mode .field-label {
+  color: #cfbfeb;
+}
+
+.theme-toggle {
+  min-width: 2.2rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .error {
