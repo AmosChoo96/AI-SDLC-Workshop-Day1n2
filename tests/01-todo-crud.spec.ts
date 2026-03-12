@@ -257,15 +257,14 @@ test.describe("PRP 01: Todo CRUD Operations", () => {
 
   test.describe("Sorting and ordering", () => {
     test("should sort todos by priority then creation date", async () => {
-      await h.createTodo({ title: "Low priority", priority: "low" });
-      await h.createTodo({ title: "High priority", priority: "high" });
-      await h.createTodo({ title: "Medium priority", priority: "medium" });
+      const { body: low } = await h.createTodo({ title: "Low priority", priority: "low" });
+      const { body: high } = await h.createTodo({ title: "High priority", priority: "high" });
+      const { body: medium } = await h.createTodo({ title: "Medium priority", priority: "medium" });
 
+      const createdIds = new Set([low.data.id, high.data.id, medium.data.id]);
       const { body } = await h.listTodos();
       const titles = body.data
-        .filter((t: any) => 
-          ["Low priority", "High priority", "Medium priority"].includes(t.title)
-        )
+        .filter((t: any) => createdIds.has(t.id))
         .map((t: any) => t.title);
 
       expect(titles[0]).toBe("High priority");

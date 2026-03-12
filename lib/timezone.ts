@@ -15,11 +15,13 @@ const dateTimeFormat = new Intl.DateTimeFormat("en-CA", {
 
 export function getSingaporeNow(): Date {
   // Converts current instant into a Date interpreted in Singapore local clock time.
-  const parts = dateTimeFormat.formatToParts(new Date());
+  const raw = new Date();
+  const parts = dateTimeFormat.formatToParts(raw);
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const ms = String(raw.getMilliseconds()).padStart(3, "0");
 
   return new Date(
-    `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+08:00`,
+    `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}.${ms}+08:00`,
   );
 }
 

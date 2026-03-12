@@ -104,26 +104,25 @@ test.describe("PRP 02: Priority System", () => {
   test.describe("Priority sorting", () => {
     test("should sort todos: high > medium > low", async () => {
       // Create todos in random order
-      const todo3 = await h.createTodo({
+      const { body: low } = await h.createTodo({
         title: "Low priority",
         priority: "low",
       });
-      const todo1 = await h.createTodo({
+      const { body: high } = await h.createTodo({
         title: "High priority",
         priority: "high",
       });
-      const todo2 = await h.createTodo({
+      const { body: medium } = await h.createTodo({
         title: "Medium priority",
         priority: "medium",
       });
 
+      const createdIds = new Set([low.data.id, high.data.id, medium.data.id]);
       const { body } = await h.listTodos();
 
       // Find our test todos and verify order
       const priorities = body.data
-        .filter((t: any) =>
-          ["Low priority", "High priority", "Medium priority"].includes(t.title)
-        )
+        .filter((t: any) => createdIds.has(t.id))
         .map((t: any) => t.priority);
 
       expect(priorities[0]).toBe("high");
@@ -132,19 +131,20 @@ test.describe("PRP 02: Priority System", () => {
     });
 
     test("should sort multiple high priority todos by creation date", async () => {
-      const todo1 = await h.createTodo({
+      const { body: todo1 } = await h.createTodo({
         title: "High 1",
         priority: "high",
       });
-      const todo2 = await h.createTodo({
+      const { body: todo2 } = await h.createTodo({
         title: "High 2",
         priority: "high",
       });
 
+      const createdIds = new Set([todo1.data.id, todo2.data.id]);
       const { body } = await h.listTodos();
 
       const highPriority = body.data
-        .filter((t: any) => ["High 1", "High 2"].includes(t.title))
+        .filter((t: any) => createdIds.has(t.id))
         .map((t: any) => t.title);
 
       // Should maintain creation order (1 created before 2)

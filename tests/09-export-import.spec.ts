@@ -3,6 +3,11 @@ import { TestHelpers } from "./helpers";
 
 let h: TestHelpers;
 
+test.beforeAll(async ({ request }) => {
+  // Reset DB so the "export empty list" test starts with a clean state
+  await request.post("http://localhost:3000/api/test-reset");
+});
+
 test.beforeEach(async ({ request }) => {
   h = new TestHelpers(request);
 });
@@ -126,7 +131,7 @@ test.describe("PRP 09: Export and Import", () => {
       const todo = await h.createTodo({ title: "Parent task" });
       const todoId = todo.body.data.id;
 
-      await h.addSubtask(todoId, "Subtask 1");
+      await h.createSubtask(todoId, "Subtask 1");
 
       const response = await h.request.get("/api/todos/export");
       const body = await response.json();
@@ -430,7 +435,7 @@ test.describe("PRP 09: Export and Import", () => {
       const todo = await h.createTodo({ title: "Parent for export" });
       const todoId = todo.body.data.id;
 
-      await h.addSubtask(todoId, "Child task");
+      await h.createSubtask(todoId, "Child task");
 
       // Export
       const exportRes = await h.request.get("/api/todos/export");

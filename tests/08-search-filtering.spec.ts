@@ -3,6 +3,11 @@ import { TestHelpers } from "./helpers";
 
 let h: TestHelpers;
 
+test.beforeAll(async ({ request }) => {
+  // Reset DB to avoid tag name conflicts from earlier test files
+  await request.post("http://localhost:3000/api/test-reset");
+});
+
 test.beforeEach(async ({ request }) => {
   h = new TestHelpers(request);
 });
@@ -39,15 +44,17 @@ test.describe("PRP 08: Search and Filtering", () => {
     });
 
     test("should be case-insensitive search", async () => {
-      await h.createTodo({ title: "Buy GROCERIES" });
+      const { body: created } = await h.createTodo({ title: "Buy GROCERIES UNIQUE" });
+      const todoId = created.data.id;
 
       const { body } = await h.listTodos();
       const filtered = body.data.filter((t: any) =>
-        t.title.toLowerCase().includes("groceries")
+        t.title.toLowerCase().includes("groceries unique")
       );
 
       expect(filtered.length).toBe(1);
-      expect(filtered[0].title).toBe("Buy GROCERIES");
+      expect(filtered[0].id).toBe(todoId);
+      expect(filtered[0].title).toBe("Buy GROCERIES UNIQUE");
     });
 
     test("should find multiple todos matching search", async () => {
@@ -311,10 +318,10 @@ test.describe("PRP 08: Search and Filtering", () => {
     });
 
     test("should filter todos by multiple tags (OR logic)", async () => {
-      const urgent = await h.createTag("urgent");
+      const urgent = await h.createTag("urgent-multi");
       const urgent_id = urgent.body.data.id;
 
-      const work = await h.createTag("work");
+      const work = await h.createTag("work-multi");
       const work_id = work.body.data.id;
 
       const todo1 = await h.createTodo({ title: "Urgent report" });
@@ -331,7 +338,7 @@ test.describe("PRP 08: Search and Filtering", () => {
       const { body } = await h.listTodos();
       const tagged = body.data.filter((t: any) =>
         t.tags?.some((tag: any) =>
-          ["urgent", "work"].includes(tag.name)
+          ["urgent-multi", "work-multi"].includes(tag.name)
         )
       );
 

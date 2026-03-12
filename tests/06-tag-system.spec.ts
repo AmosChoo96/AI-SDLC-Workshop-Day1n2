@@ -3,6 +3,11 @@ import { TestHelpers } from "./helpers";
 
 let h: TestHelpers;
 
+test.beforeAll(async ({ request }) => {
+  // Clear all tags (and associated data) so unique name constraints pass on re-runs
+  await request.post("http://localhost:3000/api/test-reset");
+});
+
 test.beforeEach(async ({ request }) => {
   h = new TestHelpers(request);
 });

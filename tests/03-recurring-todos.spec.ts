@@ -213,7 +213,7 @@ test.describe("PRP 03: Recurring Todos", () => {
 
       const { body: listBody } = await h.listTodos();
       const matchingTodos = listBody.data.filter(
-        (t: any) => t.title === "One-time task"
+        (t: any) => t.id === todoId
       );
 
       // Should have only one (the completed original)

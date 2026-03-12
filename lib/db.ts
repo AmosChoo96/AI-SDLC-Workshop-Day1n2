@@ -281,8 +281,12 @@ const completeRecurringTx = db.transaction(
 );
 
 export const todoDB = {
-  list(): Todo[] {
-    return getAllStmt.all() as Todo[];
+  list(): (Todo & { tags: Tag[] })[] {
+    const todos = getAllStmt.all() as Todo[];
+    return todos.map((todo) => ({
+      ...todo,
+      tags: tagsForTodoStmt.all(todo.id) as Tag[],
+    }));
   },
 
   getById(id: number): Todo | undefined {
@@ -519,7 +523,7 @@ export const tagDB = {
 
 const allTemplatesStmt = db.prepare(`
   SELECT id, title, description, priority, subtasks_json, due_date_offset_days, created_at, updated_at
-  FROM templates ORDER BY created_at DESC;
+  FROM templates ORDER BY created_at DESC, id DESC;
 `);
 const templateByIdStmt = db.prepare(`
   SELECT id, title, description, priority, subtasks_json, due_date_offset_days, created_at, updated_at
