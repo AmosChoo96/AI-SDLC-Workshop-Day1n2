@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { todoDB } from "@/lib/db";
+import { todoDB, REMINDER_OPTIONS } from "@/lib/db";
 import {
   getSingaporeNow,
   isValidDateInput,
@@ -13,6 +13,7 @@ type UpdateTodoRequest = {
   recurrence_pattern?: "daily" | "weekly" | "monthly" | "yearly" | null;
   due_date?: string | null;
   completed?: boolean;
+  reminder_minutes?: number | null;
 };
 
 function validateUpdatePayload(body: UpdateTodoRequest): string | null {
@@ -55,6 +56,14 @@ function validateUpdatePayload(body: UpdateTodoRequest): string | null {
 
   if (body.completed !== undefined && typeof body.completed !== "boolean") {
     return "Completed must be a boolean.";
+  }
+
+  if (
+    body.reminder_minutes !== undefined &&
+    body.reminder_minutes !== null &&
+    !(REMINDER_OPTIONS as readonly number[]).includes(body.reminder_minutes)
+  ) {
+    return "Reminder must be 15, 30, 60, 120, 1440, 2880, or 10080 minutes.";
   }
 
   return null;
@@ -127,6 +136,10 @@ export async function PUT(
             : body.recurrence_pattern,
         due_date: body.due_date === undefined ? undefined : body.due_date,
         completed: body.completed,
+        reminder_minutes:
+          body.reminder_minutes === undefined
+            ? undefined
+            : body.reminder_minutes,
       },
       nowIso,
     );
