@@ -18,6 +18,8 @@ export async function POST() {
   db.exec("DELETE FROM todos");
   db.exec("DELETE FROM tags");
   db.exec("DELETE FROM templates");
+  db.exec("DELETE FROM authenticators");
+  db.exec("DELETE FROM users");
 
   db.close();
 
